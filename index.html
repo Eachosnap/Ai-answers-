@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Main Na Karu</title>
+  <style>
+    body {
+      background-color: #1e1e1e;
+      color: #ffffff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 30px 20px;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 30px;
+    }
+
+    .chat-box {
+      background-color: #2c2c2c;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 600px;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background-color: #111;
+      color: #fff;
+      margin-bottom: 15px;
+    }
+
+    button {
+      padding: 12px 25px;
+      font-size: 16px;
+      background-color: #00aaff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #response {
+      margin-top: 20px;
+      background-color: #333;
+      border-radius: 8px;
+      padding: 15px;
+      font-size: 18px;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+
+    .label {
+      font-weight: bold;
+      color: #aaa;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>AI Answer Generator</h1>
+
+  <div class="chat-box">
+    <div class="label">Ask me anything (fake AI):</div>
+    <input type="text" id="fakeQuestion" placeholder="e.g., How to become rich?" />
+    <button onclick="generateReply()">Start</button>
+
+    <div class="label" style="margin-top: 25px;">Answer:</div>
+    <div id="response">Waiting for your question...</div>
+  </div>
+
+  <script>
+    function generateReply() {
+      const replies = [
+        "Bhai kal se pakka shuru karna...",
+        "Main na karu toh?",
+        "Zaroor, lekin pehle ek panee pe lo.",
+        "Tameez seekh le pehle!",
+        "Apna kaam khud karna seekh.",
+        "poch rha to esy ha jasy jaan kr kuch ukhar ly ga.",
+        "Aik kaam kar: kuch mat kar.",
+        "Tumse na ho payega baap ko baaj.",
+        "Ab aur mat poochhna tony kon sa kuch bn jana ha pooch ky.",
+        "Jo samjho... jawab nahi milega.",
+        "Chill kar bhai, duniya waise bhi khatam ho rahi hai.",
+        "Bore mat kar bro.",
+        "Main sirf serious logo ko jawab deta hoon.",
+        "Kya zarurat thi aise sawal ki?",
+        "Tera sawal dekh ke system hang ho gaya tha.",
+        "Hmm... interesting questio.",
+        "mjy etna ata hota to ma yha hota.",
+        "Tyra paida hony ka oi maqsad b ha."
+      ];
+
+      const question = document.getElementById("fakeQuestion").value.trim();
+      if (question === "") {
+        document.getElementById("response").textContent = "Please ask something first...";
+        return;
+      }
+
+      const random = Math.floor(Math.random() * replies.length);
+      document.getElementById("response").textContent = replies[random];
+    }
+  </script>
+</body>
+</html>
