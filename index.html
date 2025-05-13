@@ -1,90 +1,134 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Live Video Call</title>
+  <title>Classic Video Call</title>
   <style>
     body {
-      background-color: #111;
-      color: #0f0;
-      font-family: sans-serif;
-      text-align: center;
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
     }
     video {
-      width: 45%;
-      border: 2px solid lime;
+      border: 2px solid #333;
+      border-radius: 8px;
+      width: 320px;
+      height: 240px;
       margin: 10px;
     }
-    button, input {
+    #controls, #room {
       margin: 10px;
-      padding: 10px;
-      font-size: 16px;
-      border: 1px solid lime;
-      background: black;
-      color: lime;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      background: #333;
+      color: white;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    input {
+      padding: 8px;
+      margin: 5px;
+      width: 200px;
     }
   </style>
 </head>
 <body>
-  <h2>Live Video Call Page</h2>
+  <h2>Classic Video Call</h2>
+  <div id="room">
+    <input type="text" id="room-id" placeholder="Enter Call ID">
+    <button onclick="joinRoom()">Join</button>
+    <button onclick="copyCallID()">Copy My ID</button>
+  </div>
+  <div>
+    <video id="localVideo" autoplay muted></video>
+    <video id="remoteVideo" autoplay></video>
+  </div>
+  <div id="controls">
+    <button onclick="toggleAudio()">Mute/Unmute</button>
+    <button onclick="toggleVideo()">Video On/Off</button>
+  </div>  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDSkgDFSIer4x_ZK123DSiOxQ8beKlKi5A",
+      authDomain: "media-f0fcf.firebaseapp.com",
+      databaseURL: "https://media-f0fcf-default-rtdb.firebaseio.com",
+      projectId: "media-f0fcf",
+      storageBucket: "media-f0fcf.firebasestorage.app",
+      messagingSenderId: "353720752991",
+      appId: "1:353720752991:web:eb0d7dd859a2292a2df4ea"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-  <video id="localVideo" autoplay muted></video>
-  <video id="remoteVideo" autoplay></video>
-
-  <br>
-
-  <button id="startCall">Start Call</button>
-  <button id="joinCall">Join Call</button>
-
-  <br>
-  <input type="text" id="callInput" placeholder="Enter Call ID">
-  <p>Your Call ID: <span id="myId"></span></p>
-
-  <!-- PeerJS -->
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <script>
+    let localStream, peerConnection;
+    const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     const localVideo = document.getElementById('localVideo');
     const remoteVideo = document.getElementById('remoteVideo');
-    const startCall = document.getElementById('startCall');
-    const joinCall = document.getElementById('joinCall');
-    const callInput = document.getElementById('callInput');
-    const myId = document.getElementById('myId');
+    let roomId = '';
 
-    const peer = new Peer();
+    async function joinRoom() {
+      roomId = document.getElementById('room-id').value.trim();
+      if (!roomId) return alert('Enter a Call ID');
 
-    let localStream;
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localVideo.srcObject = localStream;
 
-    // Get camera and mic
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then(stream => {
-        localStream = stream;
-        localVideo.srcObject = stream;
+      peerConnection = new RTCPeerConnection(servers);
+      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+      peerConnection.ontrack = ({ streams: [stream] }) => remoteVideo.srcObject = stream;
+      peerConnection.onicecandidate = e => {
+        if (e.candidate) db.ref(`calls/${roomId}/ice`).push(JSON.stringify(e.candidate));
+      };
+
+      const offerRef = db.ref(`calls/${roomId}/offer`);
+      const answerRef = db.ref(`calls/${roomId}/answer`);
+      const iceRef = db.ref(`calls/${roomId}/ice`);
+
+      const offerSnap = await offerRef.get();
+      if (offerSnap.exists()) {
+        const offer = JSON.parse(offerSnap.val());
+        await peerConnection.setRemoteDescription(offer);
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        answerRef.set(JSON.stringify(answer));
+      } else {
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        offerRef.set(JSON.stringify(offer));
+
+        answerRef.on('value', async snap => {
+          if (snap.exists()) {
+            const answer = JSON.parse(snap.val());
+            await peerConnection.setRemoteDescription(answer);
+          }
+        });
+      }
+
+      iceRef.on('child_added', async snap => {
+        const data = JSON.parse(snap.val());
+        if (data) await peerConnection.addIceCandidate(new RTCIceCandidate(data));
       });
+    }
 
-    peer.on('open', id => {
-      myId.textContent = id;
-    });
+    function toggleAudio() {
+      localStream.getAudioTracks().forEach(t => t.enabled = !t.enabled);
+    }
 
-    // Incoming call
-    peer.on('call', call => {
-      call.answer(localStream);
-      call.on('stream', remoteStream => {
-        remoteVideo.srcObject = remoteStream;
-      });
-    });
+    function toggleVideo() {
+      localStream.getVideoTracks().forEach(t => t.enabled = !t.enabled);
+    }
 
-    // Start call
-    startCall.onclick = () => {
-      alert("Share this ID with your friend to join:\n" + peer.id);
-    };
-
-    // Join call
-    joinCall.onclick = () => {
-      const call = peer.call(callInput.value, localStream);
-      call.on('stream', remoteStream => {
-        remoteVideo.srcObject = remoteStream;
-      });
-    };
-  </script>
-</body>
+    function copyCallID() {
+      const id = document.getElementById('room-id').value;
+      if (!id) return alert("Enter or create a Call ID first");
+      navigator.clipboard.writeText(id).then(() => alert('Call ID copied!'));
+    }
+  </script></body>
 </html>
