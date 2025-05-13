@@ -1,66 +1,90 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Live Video Call Page</title>
+  <meta charset="UTF-8">
+  <title>Live Video Call</title>
   <style>
-    body { background: #111; color: lime; text-align: center; font-family: sans-serif; }
-    video { width: 45%; border: 2px solid lime; margin: 10px; }
-    button, input { margin: 10px; padding: 10px; }
+    body {
+      background-color: #111;
+      color: #0f0;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    video {
+      width: 45%;
+      border: 2px solid lime;
+      margin: 10px;
+    }
+    button, input {
+      margin: 10px;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid lime;
+      background: black;
+      color: lime;
+    }
   </style>
 </head>
 <body>
   <h2>Live Video Call Page</h2>
-  <video id="myVideo" autoplay muted></video>
-  <video id="friendVideo" autoplay></video>
+
+  <video id="localVideo" autoplay muted></video>
+  <video id="remoteVideo" autoplay></video>
+
   <br>
-  <button onclick="startCall()">Start Call</button>
-  <button onclick="joinCall()">Join Call</button><br>
-  <input type="text" id="callIdInput" placeholder="Enter Call ID to Join">
+
+  <button id="startCall">Start Call</button>
+  <button id="joinCall">Join Call</button>
+
+  <br>
+  <input type="text" id="callInput" placeholder="Enter Call ID">
   <p>Your Call ID: <span id="myId"></span></p>
 
-  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+  <!-- PeerJS -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-    const myVideo = document.getElementById('myVideo');
-    const friendVideo = document.getElementById('friendVideo');
-    const myIdText = document.getElementById('myId');
-    const callIdInput = document.getElementById('callIdInput');
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const startCall = document.getElementById('startCall');
+    const joinCall = document.getElementById('joinCall');
+    const callInput = document.getElementById('callInput');
+    const myId = document.getElementById('myId');
 
-    const peer = new Peer({
-      host: 'peerjs.com',
-      secure: true,
-      port: 443
-    });
+    const peer = new Peer();
 
     let localStream;
 
+    // Get camera and mic
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       .then(stream => {
         localStream = stream;
-        myVideo.srcObject = stream;
+        localVideo.srcObject = stream;
       });
 
     peer.on('open', id => {
-      myIdText.textContent = id;
+      myId.textContent = id;
     });
 
+    // Incoming call
     peer.on('call', call => {
       call.answer(localStream);
-      call.on('stream', friendStream => {
-        friendVideo.srcObject = friendStream;
+      call.on('stream', remoteStream => {
+        remoteVideo.srcObject = remoteStream;
       });
     });
 
-    function startCall() {
-      alert("Give this ID to your friend to join: " + peer.id);
-    }
+    // Start call
+    startCall.onclick = () => {
+      alert("Share this ID with your friend to join:\n" + peer.id);
+    };
 
-    function joinCall() {
-      const callId = callIdInput.value;
-      const call = peer.call(callId, localStream);
-      call.on('stream', friendStream => {
-        friendVideo.srcObject = friendStream;
+    // Join call
+    joinCall.onclick = () => {
+      const call = peer.call(callInput.value, localStream);
+      call.on('stream', remoteStream => {
+        remoteVideo.srcObject = remoteStream;
       });
-    }
+    };
   </script>
 </body>
 </html>
