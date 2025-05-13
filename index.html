@@ -34,15 +34,18 @@
 
   <script>
     const firebaseConfig = {
-      apiKey: "AIzaSyDSkgDFSIer4x_ZK123DSiOxQ8beKlKi5A",
-      authDomain: "media-f0fcf.firebaseapp.com",
-      projectId: "media-f0fcf",
-      storageBucket: "media-f0fcf.firebasestorage.app",
-      messagingSenderId: "353720752991",
-      appId: "1:353720752991:web:eb0d7dd859a2292a2df4ea"
+      apiKey: "AIzaSyByYx-ScUywHwz_YK_ZV7rDREBTScrWWKs",
+      authDomain: "livesnap-d57c2.firebaseapp.com",
+      databaseURL: "https://livesnap-d57c2-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "livesnap-d57c2",
+      storageBucket: "livesnap-d57c2.firebasestorage.app",
+      messagingSenderId: "24202813286",
+      appId: "1:24202813286:web:02304adf2c5ffed9fab2a7",
+      measurementId: "G-BR9MFH2XN6"
     };
+
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    const db = firebase.database();
 
     const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     const pc = new RTCPeerConnection(servers);
