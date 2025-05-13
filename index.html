@@ -2,101 +2,123 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Live Video Call</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #121212;
+      text-align: center;
+      background: #111;
       color: white;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
+      font-family: sans-serif;
     }
     video {
       width: 45%;
+      border: 2px solid white;
       margin: 10px;
-      border: 3px solid #00ffcc;
-      border-radius: 10px;
-    }
-    #videos {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    input, button {
-      margin: 10px;
-      padding: 10px;
-      font-size: 16px;
     }
   </style>
 </head>
 <body>
-  <h2>Live Video Call (WebRTC)</h2>
-  <input id="roomInput" placeholder="Enter Room ID" />
-  <button onclick="joinCall()">Join Call</button>
-  <div id="videos">
-    <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo" autoplay></video>
-  </div>
+  <h1>Live Video Call Page</h1>
+  <video id="localVideo" autoplay muted></video>
+  <video id="remoteVideo" autoplay></video>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 
   <script>
-    let localVideo = document.getElementById('localVideo');
-    let remoteVideo = document.getElementById('remoteVideo');
-    let roomInput = document.getElementById('roomInput');
-    let roomId;
-    let socket;
-    let pc;
-    const config = {
+    // ✅ 1. Firebase Config (Replaced)
+    const firebaseConfig = {
+      apiKey: "AIzaSyDSkgDFSIer4x_ZK123DSiOxQ8beKlKi5A",
+      authDomain: "media-f0fcf.firebaseapp.com",
+      databaseURL: "https://media-f0fcf-default-rtdb.firebaseio.com",
+      projectId: "media-f0fcf",
+      storageBucket: "media-f0fcf.firebasestorage.app",
+      messagingSenderId: "353720752991",
+      appId: "1:353720752991:android:eb0d7dd859a2292a2df4ea"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    let localStream;
+    let peerConnection;
+    const roomRef = db.ref("video-call-room");
+
+    const servers = {
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     };
 
-    async function joinCall() {
-      roomId = roomInput.value;
-      if (!roomId) return alert("Enter room ID first");
-
-      socket = new WebSocket('wss://your-signaling-server-url'); // <-- Change this
-
-      socket.onmessage = async (message) => {
-        const data = JSON.parse(message.data);
-        if (data.offer) {
-          await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          socket.send(JSON.stringify({ roomId, answer }));
-        }
-        if (data.answer) {
-          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-        }
-        if (data.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-        }
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+      localStream = stream;
       localVideo.srcObject = stream;
+      createConnection();
+    });
 
-      pc = new RTCPeerConnection(config);
+    function createConnection() {
+      peerConnection = new RTCPeerConnection(servers);
+      localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+      });
 
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-      pc.onicecandidate = event => {
-        if (event.candidate) {
-          socket.send(JSON.stringify({ roomId, candidate: event.candidate }));
-        }
-      };
-
-      pc.ontrack = event => {
+      peerConnection.ontrack = event => {
         remoteVideo.srcObject = event.streams[0];
       };
 
-      socket.onopen = async () => {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.send(JSON.stringify({ roomId, offer }));
+      peerConnection.onicecandidate = event => {
+        if (event.candidate) {
+          db.ref("video-call-room/candidates/" + myId).push(JSON.stringify(event.candidate));
+        }
       };
+
+      roomRef.once("value").then(snapshot => {
+        if (snapshot.exists()) {
+          joinCall();
+        } else {
+          createCall();
+        }
+      });
     }
+
+    async function createCall() {
+      myId = "caller";
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      roomRef.child("offer").set(JSON.stringify(offer));
+
+      roomRef.child("answer").on("value", async snapshot => {
+        if (snapshot.exists()) {
+          const answer = JSON.parse(snapshot.val());
+          await peerConnection.setRemoteDescription(answer);
+        }
+      });
+
+      listenForCandidates("callee");
+    }
+
+    async function joinCall() {
+      myId = "callee";
+      roomRef.child("offer").once("value", async snapshot => {
+        const offer = JSON.parse(snapshot.val());
+        await peerConnection.setRemoteDescription(offer);
+
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        roomRef.child("answer").set(JSON.stringify(answer));
+      });
+
+      listenForCandidates("caller");
+    }
+
+    function listenForCandidates(partnerId) {
+      roomRef.child("candidates/" + partnerId).on("child_added", snapshot => {
+        const candidate = new RTCIceCandidate(JSON.parse(snapshot.val()));
+        peerConnection.addIceCandidate(candidate);
+      });
+    }
+
+    let myId = "";
   </script>
 </body>
 </html>
