@@ -1,37 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Secure Video Call</title>
+  <meta charset="UTF-8">
+  <title>Live Photo Sync</title>
   <style>
-    body { font-family: Arial; text-align: center; background: #111; color: #eee; }
-    video { width: 45%; margin: 10px; background: #000; }
-    input, button { margin: 8px; padding: 10px; font-size: 16px; }
-    #controls button { margin: 5px; }
+    body {
+      background: black;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: white;
+      font-family: sans-serif;
+    }
+    video, img {
+      max-width: 100%;
+      height: auto;
+      margin-top: 10px;
+    }
+    button {
+      padding: 10px;
+      margin-top: 15px;
+      background: #00ffcc;
+      color: black;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
   </style>
 </head>
 <body>
-  <h2>Live Secure Video Call</h2>
+  <h2>Live Photo Sync</h2>
+  <video id="video" autoplay playsinline></video>
+  <button onclick="capture()">Capture & Send</button>
+  <img id="livePhoto" src="" />
 
-  <div>
-    <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo" autoplay></video>
-  </div>
+  <canvas id="canvas" style="display:none;"></canvas>
 
-  <div>
-    <input type="text" id="callId" placeholder="Enter Call ID">
-    <button onclick="startCall()">Start Call</button>
-    <button onclick="joinCall()">Join Call</button>
-  </div>
-
-  <div id="controls">
-    <button onclick="toggleMic()">Mute / Unmute</button>
-    <button onclick="toggleFlash()">Flash On / Off</button>
-    <button onclick="endCall()">End Call</button>
-  </div>
-
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyByYx-ScUywHwz_YK_ZV7rDREBTScrWWKs",
@@ -47,100 +55,36 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    const pc = new RTCPeerConnection(servers);
-    let localStream, remoteStream;
-    const localVideo = document.getElementById('localVideo');
-    const remoteVideo = document.getElementById('remoteVideo');
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const img = document.getElementById('livePhoto');
 
-    async function startCamera() {
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-      localVideo.srcObject = localStream;
-      remoteStream = new MediaStream();
-      remoteVideo.srcObject = remoteStream;
-      pc.ontrack = e => remoteStream.addTrack(e.track);
-    }
+    // Show camera on iPhone
+    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+      video.srcObject = stream;
+    });
 
-    async function startCall() {
-      await startCamera();
-      const callId = document.getElementById("callId").value;
-      const callDoc = db.collection("calls").doc(callId);
-      const offerCandidates = callDoc.collection("offerCandidates");
-      const answerCandidates = callDoc.collection("answerCandidates");
+    // Capture photo and upload to Firebase
+    function capture() {
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg");
 
-      pc.onicecandidate = e => e.candidate && offerCandidates.add(e.candidate.toJSON());
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      await callDoc.set({ offer });
-
-      callDoc.onSnapshot(snapshot => {
-        const data = snapshot.data();
-        if (!pc.currentRemoteDescription && data?.answer) {
-          pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-        }
-      });
-
-      answerCandidates.onSnapshot(snapshot => {
-        snapshot.docChanges().forEach(change => {
-          if (change.type === "added") {
-            pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
-          }
-        });
+      db.ref("livephoto").set({
+        image: dataUrl,
+        time: Date.now()
       });
     }
 
-    async function joinCall() {
-      await startCamera();
-      const callId = document.getElementById("callId").value;
-      const callDoc = db.collection("calls").doc(callId);
-      const offerCandidates = callDoc.collection("offerCandidates");
-      const answerCandidates = callDoc.collection("answerCandidates");
-
-      pc.onicecandidate = e => e.candidate && answerCandidates.add(e.candidate.toJSON());
-
-      const callData = (await callDoc.get()).data();
-      await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      await callDoc.update({ answer });
-
-      offerCandidates.onSnapshot(snapshot => {
-        snapshot.docChanges().forEach(change => {
-          if (change.type === "added") {
-            pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
-          }
-        });
-      });
-    }
-
-    function toggleMic() {
-      localStream.getAudioTracks().forEach(track => track.enabled = !track.enabled);
-    }
-
-    async function toggleFlash() {
-      const videoTrack = localStream.getVideoTracks()[0];
-      const capabilities = videoTrack.getCapabilities();
-      if (capabilities.torch) {
-        const currentTorch = videoTrack.getSettings().torch || false;
-        await videoTrack.applyConstraints({ advanced: [{ torch: !currentTorch }] });
-      } else {
-        alert("Flashlight not supported on this device.");
+    // Real-time update on Android or other phone
+    db.ref("livephoto").on("value", snapshot => {
+      const data = snapshot.val();
+      if (data && data.image) {
+        img.src = data.image;
       }
-    }
-
-    function endCall() {
-      pc.close();
-      if (localVideo.srcObject) {
-        localVideo.srcObject.getTracks().forEach(track => track.stop());
-      }
-      if (remoteVideo.srcObject) {
-        remoteVideo.srcObject.getTracks().forEach(track => track.stop());
-      }
-      alert("Call ended");
-      window.location.reload();
-    }
+    });
   </script>
 </body>
 </html>
