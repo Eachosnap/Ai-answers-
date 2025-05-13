@@ -1,36 +1,55 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html>
 <head>
-  <meta charset="UTF-8" />
   <title>Live Video Call</title>
   <style>
     body {
+      background-color: #111;
+      color: #0f0;
       text-align: center;
-      background: #111;
-      color: white;
-      font-family: sans-serif;
+      font-family: Arial, sans-serif;
     }
     video {
-      width: 45%;
-      border: 2px solid white;
+      width: 300px;
+      height: 400px;
+      border: 2px solid #0f0;
       margin: 10px;
+    }
+    #videos {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      background-color: #0f0;
+      border: none;
+      cursor: pointer;
+    }
+    #callIdContainer {
+      margin: 10px;
+      color: #fff;
+    }
+    #callIdInput {
+      padding: 8px;
+      width: 200px;
     }
   </style>
 </head>
 <body>
-  <h1>Live Video Call Page</h1>
-  <video id="localVideo" autoplay muted></video>
-  <video id="remoteVideo" autoplay></video>
+  <h2>Live Video Call</h2>  <div id="videos">
+    <video id="localVideo" autoplay muted></video>
+    <video id="remoteVideo" autoplay></video>
+  </div>  <div id="callIdContainer">
+    <p>Your Call ID: <span id="callIdText">Not started</span></p>
+    <input type="text" id="callIdInput" placeholder="Enter Call ID to Join">
+  </div><button onclick="startCall()">Start Call</button> <button onclick="joinCall()">Join Call</button>
 
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
-
-  <script>
-    // ✅ 1. Firebase Config (Replaced)
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>  <script>
     const firebaseConfig = {
       apiKey: "AIzaSyDSkgDFSIer4x_ZK123DSiOxQ8beKlKi5A",
       authDomain: "media-f0fcf.firebaseapp.com",
-      databaseURL: "https://media-f0fcf-default-rtdb.firebaseio.com",
       projectId: "media-f0fcf",
       storageBucket: "media-f0fcf.firebasestorage.app",
       messagingSenderId: "353720752991",
@@ -38,87 +57,127 @@
     };
 
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    const firestore = firebase.firestore();
 
-    const localVideo = document.getElementById('localVideo');
-    const remoteVideo = document.getElementById('remoteVideo');
-    let localStream;
-    let peerConnection;
-    const roomRef = db.ref("video-call-room");
+    let localStream = null;
+    let remoteStream = null;
+    let peerConnection = null;
 
     const servers = {
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      iceServers: [
+        {
+          urls: [
+            "stun:stun.l.google.com:19302",
+            "stun:stun1.l.google.com:19302"
+          ]
+        }
+      ]
     };
 
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-      localStream = stream;
-      localVideo.srcObject = stream;
-      createConnection();
-    });
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+    const callIdText = document.getElementById("callIdText");
 
-    function createConnection() {
+    async function startCall() {
       peerConnection = new RTCPeerConnection(servers);
-      localStream.getTracks().forEach(track => {
-        peerConnection.addTrack(track, localStream);
-      });
 
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      remoteStream = new MediaStream();
+
+      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
       peerConnection.ontrack = event => {
-        remoteVideo.srcObject = event.streams[0];
+        event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
       };
+
+      localVideo.srcObject = localStream;
+      remoteVideo.srcObject = remoteStream;
+
+      const callDoc = firestore.collection("calls").doc();
+      const offerCandidates = callDoc.collection("offerCandidates");
+      const answerCandidates = callDoc.collection("answerCandidates");
+
+      callIdText.innerText = callDoc.id;
 
       peerConnection.onicecandidate = event => {
         if (event.candidate) {
-          db.ref("video-call-room/candidates/" + myId).push(JSON.stringify(event.candidate));
+          offerCandidates.add(event.candidate.toJSON());
         }
       };
 
-      roomRef.once("value").then(snapshot => {
-        if (snapshot.exists()) {
-          joinCall();
-        } else {
-          createCall();
-        }
-      });
-    }
+      const offerDescription = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offerDescription);
 
-    async function createCall() {
-      myId = "caller";
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-      roomRef.child("offer").set(JSON.stringify(offer));
+      const offer = {
+        sdp: offerDescription.sdp,
+        type: offerDescription.type
+      };
 
-      roomRef.child("answer").on("value", async snapshot => {
-        if (snapshot.exists()) {
-          const answer = JSON.parse(snapshot.val());
-          await peerConnection.setRemoteDescription(answer);
+      await callDoc.set({ offer });
+
+      callDoc.onSnapshot(snapshot => {
+        const data = snapshot.data();
+        if (!peerConnection.currentRemoteDescription && data?.answer) {
+          const answerDescription = new RTCSessionDescription(data.answer);
+          peerConnection.setRemoteDescription(answerDescription);
         }
       });
 
-      listenForCandidates("callee");
+      answerCandidates.onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === "added") {
+            const candidate = new RTCIceCandidate(change.doc.data());
+            peerConnection.addIceCandidate(candidate);
+          }
+        });
+      });
     }
 
     async function joinCall() {
-      myId = "callee";
-      roomRef.child("offer").once("value", async snapshot => {
-        const offer = JSON.parse(snapshot.val());
-        await peerConnection.setRemoteDescription(offer);
+      const callId = document.getElementById("callIdInput").value;
+      const callDoc = firestore.collection("calls").doc(callId);
+      const offerCandidates = callDoc.collection("offerCandidates");
+      const answerCandidates = callDoc.collection("answerCandidates");
 
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        roomRef.child("answer").set(JSON.stringify(answer));
+      peerConnection = new RTCPeerConnection(servers);
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      remoteStream = new MediaStream();
+
+      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+      peerConnection.ontrack = event => {
+        event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+      };
+
+      localVideo.srcObject = localStream;
+      remoteVideo.srcObject = remoteStream;
+
+      peerConnection.onicecandidate = event => {
+        if (event.candidate) {
+          answerCandidates.add(event.candidate.toJSON());
+        }
+      };
+
+      const callData = (await callDoc.get()).data();
+      const offerDescription = callData.offer;
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(offerDescription));
+
+      const answerDescription = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answerDescription);
+
+      const answer = {
+        type: answerDescription.type,
+        sdp: answerDescription.sdp
+      };
+
+      await callDoc.update({ answer });
+
+      offerCandidates.onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === "added") {
+            const data = change.doc.data();
+            peerConnection.addIceCandidate(new RTCIceCandidate(data));
+          }
+        });
       });
-
-      listenForCandidates("caller");
     }
-
-    function listenForCandidates(partnerId) {
-      roomRef.child("candidates/" + partnerId).on("child_added", snapshot => {
-        const candidate = new RTCIceCandidate(JSON.parse(snapshot.val()));
-        peerConnection.addIceCandidate(candidate);
-      });
-    }
-
-    let myId = "";
-  </script>
-</body>
+  </script></body>
 </html>
