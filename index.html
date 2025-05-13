@@ -82,6 +82,8 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg");
 
+      console.log("Captured & uploading to key:", captureKey); // Debug log
+
       db.ref("livephoto/" + captureKey).set({
         image: dataUrl,
         time: Date.now()
