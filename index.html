@@ -3,69 +3,115 @@
   <title>Secure Video Call</title>
   <style>
     body {
-      background: #f0f0f0;
       font-family: Arial, sans-serif;
+      background: #f0f0f0;
       text-align: center;
-      padding: 20px;
     }
     video {
       width: 45%;
-      border: 2px solid #333;
+      border: 2px solid black;
       margin: 10px;
     }
     input, button {
-      margin: 10px;
       padding: 10px;
-      font-size: 16px;
+      margin: 5px;
     }
   </style>
 </head>
 <body>
   <h2>Secure Video Call</h2>
-  <div>
-    <button onclick="startCall()">Start Call</button>
-    <input type="text" id="roomInput" placeholder="Enter Call Key">
-    <button onclick="joinCall()">Join Call</button>
-    <p>Your Call Key: <span id="callKey"></span></p>
-  </div>
-  <div>
-    <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo" autoplay></video>
-  </div>  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>  <script>
+  <input id="callKey" placeholder="Enter Call Key">
+  <br>
+  <button onclick="startCall()">Start Call</button>
+  <button onclick="joinCall()">Join Call</button>
+  <p>Your Call Key: <span id="myCallKey"></span></p><video id="localVideo" autoplay playsinline muted></video> <video id="remoteVideo" autoplay playsinline></video>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDSkgDFSIer4x_ZK123DSiOxQ8beKlKi5A",
+      authDomain: "media-f0fcf.firebaseapp.com",
+      databaseURL: "https://media-f0fcf-default-rtdb.firebaseio.com",
+      projectId: "media-f0fcf",
+      storageBucket: "media-f0fcf.firebasestorage.app",
+      messagingSenderId: "353720752991",
+      appId: "1:353720752991:web:eb0d7dd859a2292a2df4ea"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const callKeyInput = document.getElementById('callKey');
+    const myCallKey = document.getElementById('myCallKey');
+
+    let pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
     let localStream;
-    let peer;
-    let call;
 
-    async function startCall() {
-      const key = Math.random().toString(36).substr(2, 9);
-      document.getElementById('callKey').innerText = key;
-      peer = new Peer(key);
-
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      document.getElementById('localVideo').srcObject = stream;
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+      localVideo.srcObject = stream;
       localStream = stream;
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    });
 
-      peer.on('call', incomingCall => {
-        incomingCall.answer(localStream);
-        incomingCall.on('stream', remoteStream => {
-          document.getElementById('remoteVideo').srcObject = remoteStream;
+    pc.onicecandidate = e => {
+      if (e.candidate) {
+        const callKey = callKeyInput.value;
+        db.ref(`${callKey}/candidates/${isCaller ? 'offer' : 'answer'}`).push(JSON.stringify(e.candidate));
+      }
+    };
+
+    pc.ontrack = e => {
+      remoteVideo.srcObject = e.streams[0];
+    };
+
+    let isCaller = false;
+
+    function startCall() {
+      isCaller = true;
+      const callKey = Math.random().toString(36).substring(2, 10);
+      callKeyInput.value = callKey;
+      myCallKey.textContent = callKey;
+
+      pc.createOffer().then(offer => {
+        pc.setLocalDescription(offer);
+        db.ref(`${callKey}/offer`).set(JSON.stringify(offer));
+        db.ref(`${callKey}/answer`).on('value', snap => {
+          if (snap.exists()) {
+            pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(snap.val())));
+          }
         });
+      });
+
+      db.ref(`${callKey}/candidates/answer`).on('child_added', snap => {
+        pc.addIceCandidate(new RTCIceCandidate(JSON.parse(snap.val())));
       });
     }
 
-    async function joinCall() {
-      const key = document.getElementById('roomInput').value.trim();
-      peer = new Peer();
+    function joinCall() {
+      isCaller = false;
+      const callKey = callKeyInput.value;
+      myCallKey.textContent = callKey;
 
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      document.getElementById('localVideo').srcObject = stream;
-      localStream = stream;
+      db.ref(`${callKey}/offer`).once('value').then(snap => {
+        if (snap.exists()) {
+          const offer = JSON.parse(snap.val());
+          pc.setRemoteDescription(new RTCSessionDescription(offer));
 
-      peer.on('open', () => {
-        call = peer.call(key, localStream);
-        call.on('stream', remoteStream => {
-          document.getElementById('remoteVideo').srcObject = remoteStream;
-        });
+          pc.createAnswer().then(answer => {
+            pc.setLocalDescription(answer);
+            db.ref(`${callKey}/answer`).set(JSON.stringify(answer));
+          });
+        }
+      });
+
+      db.ref(`${callKey}/candidates/offer`).on('child_added', snap => {
+        pc.addIceCandidate(new RTCIceCandidate(JSON.parse(snap.val())));
+      });
+
+      db.ref(`${callKey}/candidates/answer`).on('child_added', snap => {
+        pc.addIceCandidate(new RTCIceCandidate(JSON.parse(snap.val())));
       });
     }
   </script></body>
