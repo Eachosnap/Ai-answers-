@@ -2,24 +2,34 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Photo Sync - Touch Only</title>
+  <title>Secure Live Photo</title>
   <style>
     body {
-      background: black;
       margin: 0;
       padding: 0;
-      height: 100vh;
-      overflow-y: scroll;
+      background: black;
+      color: white;
       font-family: sans-serif;
+      text-align: center;
+    }
+    #login {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    #login input {
+      padding: 10px;
+      font-size: 18px;
+      width: 250px;
     }
     #captureArea {
       height: 100vh;
       width: 100vw;
     }
     #result {
-      text-align: center;
       padding: 20px;
-      color: white;
     }
     #livePhoto {
       width: 90%;
@@ -30,67 +40,86 @@
   </style>
 </head>
 <body>
-  <div id="captureArea" ontouchstart="capture()" onclick="capture()"></div>
 
+<div id="login">
+  <h2>Enter Access Key</h2>
+  <input type="text" id="accessKey" placeholder="Enter your secret key" />
+  <button onclick="grantAccess()">Enter</button>
+</div>
+
+<div id="main" style="display:none">
+  <div id="captureArea" ontouchstart="capture()" onclick="capture()"></div>
   <div id="result">
     <h3>Captured Photo:</h3>
-    <img id="livePhoto" src="" alt="Waiting for photo..." />
+    <img id="livePhoto" src="" alt="Waiting..." />
   </div>
+</div>
 
-  <video id="video" autoplay playsinline style="display:none;"></video>
-  <canvas id="canvas" style="display:none;"></canvas>
+<video id="video" autoplay playsinline style="display:none;"></video>
+<canvas id="canvas" style="display:none;"></canvas>
 
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyByYx-ScUywHwz_YK_ZV7rDREBTScrWWKs",
-      authDomain: "livesnap-d57c2.firebaseapp.com",
-      databaseURL: "https://livesnap-d57c2-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "livesnap-d57c2",
-      storageBucket: "livesnap-d57c2.firebasestorage.app",
-      messagingSenderId: "24202813286",
-      appId: "1:24202813286:web:02304adf2c5ffed9fab2a7",
-      measurementId: "G-BR9MFH2XN6"
-    };
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyByYx-ScUywHwz_YK_ZV7rDREBTScrWWKs",
+    authDomain: "livesnap-d57c2.firebaseapp.com",
+    databaseURL: "https://livesnap-d57c2-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "livesnap-d57c2",
+    storageBucket: "livesnap-d57c2.firebasestorage.app",
+    messagingSenderId: "24202813286",
+    appId: "1:24202813286:web:02304adf2c5ffed9fab2a7",
+    measurementId: "G-BR9MFH2XN6"
+  };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const img = document.getElementById('livePhoto');
+  let userKey = "";
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const img = document.getElementById('livePhoto');
+
+  function grantAccess() {
+    const keyInput = document.getElementById('accessKey');
+    const key = keyInput.value.trim();
+    if (key === "") {
+      alert("Please enter a key.");
+      return;
+    }
+
+    userKey = key;
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
 
     // Start camera
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
     });
 
-    // Capture on any touch
-    function capture() {
-      const ctx = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg");
-
-      // Upload to Firebase
-      db.ref("livephoto").set({
-        image: dataUrl,
-        time: Date.now()
-      });
-
-      // Smooth scroll to result
-      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
-    }
-
-    // Listen and display live image
-    db.ref("livephoto").on("value", snapshot => {
+    // Listen to Firebase path based on key
+    db.ref("livephoto/" + userKey).on("value", snapshot => {
       const data = snapshot.val();
       if (data && data.image) {
         img.src = data.image;
       }
     });
-  </script>
+  }
+
+  function capture() {
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg");
+
+    db.ref("livephoto/" + userKey).set({
+      image: dataUrl,
+      time: Date.now()
+    });
+
+    document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+  }
+</script>
 </body>
 </html>
