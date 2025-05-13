@@ -40,6 +40,11 @@
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
 
+    if (!key) {
+      document.body.innerHTML = "<h2 style='color:white;text-align:center;margin-top:50px;'>No Key Provided in URL</h2>";
+      throw new Error("Key not found in URL");
+    }
+
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
     });
