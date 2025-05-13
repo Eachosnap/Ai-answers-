@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Secure LiveSnap</title>
+  <title>LiveSnap Secure</title>
   <style>
     body {
       margin: 0;
@@ -66,7 +66,7 @@
   const captureKey = params.get("capture");
 
   if (captureKey) {
-    // Show capture page
+    // Show capture page (iPhone)
     document.getElementById("capture").style.display = "block";
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
@@ -88,7 +88,7 @@
       });
     }
   } else {
-    // Show control panel
+    // Show control panel (Android)
     document.getElementById("control").style.display = "block";
 
     function generateLink() {
