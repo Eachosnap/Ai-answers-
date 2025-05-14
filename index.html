@@ -2,39 +2,49 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Photo Sync - Touch Only</title>
+  <title>Live Photo Sync - 9 Photos Grid</title>
   <style>
     body {
       background: black;
       margin: 0;
       padding: 0;
-      height: 100vh;
-      overflow-y: scroll;
       font-family: sans-serif;
+      color: white;
+      overflow-y: scroll;
+      min-height: 100vh;
     }
+
     #captureArea {
       height: 100vh;
       width: 100vw;
     }
+
     #result {
-      text-align: center;
       padding: 20px;
-      color: white;
+      text-align: center;
     }
-    #livePhoto {
+
+    #photoGrid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      justify-items: center;
+    }
+
+    .livePhoto {
       width: 90%;
-      max-width: 400px;
-      margin-top: 20px;
+      max-width: 120px;
       border: 2px solid white;
     }
   </style>
 </head>
 <body>
+
   <div id="captureArea" ontouchstart="capture()" onclick="capture()"></div>
 
   <div id="result">
-    <h3>Captured Photo:</h3>
-    <img id="livePhoto" src="" alt="Waiting for photo..." />
+    <h3>Live Photo Grid:</h3>
+    <div id="photoGrid"></div>
   </div>
 
   <video id="video" autoplay playsinline style="display:none;"></video>
@@ -59,14 +69,14 @@
 
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const img = document.getElementById('livePhoto');
+    const photoGrid = document.getElementById('photoGrid');
 
     // Start camera
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
     });
 
-    // Capture on any touch
+    // Capture photo and push to array
     function capture() {
       const ctx = canvas.getContext('2d');
       canvas.width = video.videoWidth;
@@ -74,22 +84,26 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg");
 
-      // Upload to Firebase
-      db.ref("livephoto").set({
-        image: dataUrl,
-        time: Date.now()
+      db.ref("livephotos").once("value", snapshot => {
+        const currentPhotos = snapshot.val() || [];
+        if (currentPhotos.length >= 9) currentPhotos.shift(); // remove oldest
+        currentPhotos.push(dataUrl);
+        db.ref("livephotos").set(currentPhotos);
       });
 
-      // Smooth scroll to result
       document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Listen and display live image
-    db.ref("livephoto").on("value", snapshot => {
-      const data = snapshot.val();
-      if (data && data.image) {
-        img.src = data.image;
-      }
+    // Display 9 live photos
+    db.ref("livephotos").on("value", snapshot => {
+      const photos = snapshot.val() || [];
+      photoGrid.innerHTML = "";
+      photos.forEach(url => {
+        const img = document.createElement("img");
+        img.src = url;
+        img.className = "livePhoto";
+        photoGrid.appendChild(img);
+      });
     });
   </script>
 </body>
