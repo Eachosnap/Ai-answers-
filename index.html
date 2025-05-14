@@ -12,11 +12,24 @@
       overflow-y: scroll;
       min-height: 200vh;
     }
+
     #result {
       text-align: center;
       padding: 20px;
       color: white;
     }
+
+    #result h1 {
+      font-size: 28px;
+    }
+
+    #result p,
+    #result li,
+    .error-code {
+      font-size: 20px;
+      margin: 10px 0;
+    }
+
     #unlockBtn {
       background-color: #222;
       color: #0f0;
@@ -28,6 +41,7 @@
       cursor: pointer;
       display: none;
     }
+
     .photoGrid {
       display: flex;
       justify-content: center;
@@ -35,16 +49,18 @@
       gap: 10px;
       margin-top: 20px;
     }
+
     .photoGrid img {
       width: 45%;
       max-width: 180px;
       border: 2px solid white;
       display: none;
     }
+
     .reload-btn {
       margin-top: 20px;
-      padding: 10px 20px;
-      font-size: 16px;
+      padding: 12px 24px;
+      font-size: 18px;
       background-color: #0f0;
       color: black;
       border: none;
@@ -122,8 +138,6 @@
       if (!video.videoWidth || !video.videoHeight) return;
 
       captureCount++;
-      console.log("Capturing photo", captureCount);
-
       const ctx = canvas.getContext('2d');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -167,4 +181,4 @@
     });
   </script>
 </body>
-  </html>
+</html>
